@@ -1,0 +1,40 @@
+version: 0.2
+
+phases:
+  install:
+    on-failure: ABORT
+    runtime-version:
+        dotnet: 8
+    commands:
+      - apt-get update
+      - apt install jq
+      - sudo curl -sSL https://get.docker.com/ | sh
+  pre_build:
+    on-failure: ABORT
+    commands:
+      - echo Running pre-build commands
+      - echo Logging in to Amazon ECR
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $REPOSITORY_URI
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+  build:
+    on-failure: ABORT
+    commands:
+      - echo Running Build commands
+      - echo Build started on 'date'
+      - echo Building the Docker image...
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Build completed on 'date'
+      - echo Pushing the Docker image...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - aws ecs describe-task-definition --task-definition pennyops-poc | \jq '.taskDefinition' > taskdef.json
+      - envsubst < appspec_template.yaml > appspec.yaml
+      - printf '[{"name":"%s","imageUri":"%s"}]' "$IMAGE_REPO_NAME" "$REPOSITORY_URI:$IMAGE_TAG" > imagedefinitions.json
+artifacts:
+  files:
+    - appspec.yaml
+    - taskdef.json
+    - imagedefinitions.json
