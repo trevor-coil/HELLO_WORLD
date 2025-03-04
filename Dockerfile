@@ -1,14 +1,18 @@
-# Use a lightweight Nginx image as the base
-FROM nginx:alpine
+FROM public.ecr.aws/amazonlinux/amazonlinux:latest
 
-# Remove the default index.html
-RUN rm -f /usr/share/nginx/html/index.html
+# Update installed packages and install Apache
+RUN yum update -y && \
+ yum install -y httpd
 
-# Copy our custom index.html into the container
-COPY index.html /usr/share/nginx/html/index.html
+# Write hello world message
+RUN echo 'Hello from PennyOps!' > /var/www/html/index.html
+    
+# Configure Apache
+RUN echo 'mkdir -p /var/run/httpd' >> /root/run_apache.sh && \
+ echo 'mkdir -p /var/lock/httpd' >> /root/run_apache.sh && \
+ echo '/usr/sbin/httpd -D FOREGROUND' >> /root/run_apache.sh && \
+ chmod 755 /root/run_apache.sh
 
-# Expose port 80 for web traffic
 EXPOSE 80
 
-# Run Nginx in the foreground
-CMD ["nginx", "-g", "daemon off;"]
+CMD /root/run_apache.sh
